@@ -8,6 +8,8 @@ import { GlassCard, GlassCardContent, GlassCardHeader } from "@/components/ui/Gl
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import LanguageToggle from "@/components/LanguageToggle";
+import AnimatedBackground from "@/components/AnimatedBackground";
+import DesignerCredit from "@/components/DesignerCredit";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -81,11 +83,11 @@ const Register = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 py-10">
-      {/* Background decorations */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 -left-20 w-72 h-72 bg-primary/20 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-secondary/20 rounded-full blur-3xl" />
-      </div>
+      {/* Animated Background */}
+      <AnimatedBackground />
+
+      {/* Designer Credit */}
+      <DesignerCredit />
 
       {/* Language Toggle */}
       <div className="fixed top-4 right-4 z-50">
@@ -283,7 +285,7 @@ const Register = () => {
 
         {/* Footer */}
         <p className="text-center text-sm text-muted-foreground mt-6 animate-fade-in-up animation-delay-200">
-          © 2024 {t("appName")}. {t("copyright")}.
+          © 2025 {t("appName")}. {t("copyright")}.
         </p>
       </div>
     </div>
