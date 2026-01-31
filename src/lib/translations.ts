@@ -1,8 +1,8 @@
-// Bangla and English translations for SmartWash
+// Bangla and English translations for Wash the Goods
 export const translations = {
   en: {
     // Common
-    appName: "SmartWash",
+    appName: "Wash the Goods",
     appTagline: "Smart Washing & Vending Machine System",
     loading: "Loading...",
     cancel: "Cancel",
@@ -148,7 +148,7 @@ export const translations = {
   },
   bn: {
     // Common
-    appName: "স্মার্টওয়াশ",
+    appName: "ওয়াশ দ্য গুডস",
     appTagline: "স্মার্ট ওয়াশিং ও ভেন্ডিং মেশিন সিস্টেম",
     loading: "লোড হচ্ছে...",
     cancel: "বাতিল",
