@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { WashingMachine, MapPin, Calendar, Clock, AlertCircle, CheckCircle } from "lucide-react";
 import Header from "@/components/Header";
@@ -6,59 +6,149 @@ import { GlassCard, GlassCardContent, GlassCardHeader, GlassCardTitle } from "@/
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const WASHING_PRICE = 50;
 
-const locations = [
-  { id: "1", name: "Block A - Floor 1" },
-  { id: "2", name: "Block A - Floor 2" },
-  { id: "3", name: "Block B - Floor 1" },
-  { id: "4", name: "Block B - Floor 2" },
-];
-
 const timeSlots = [
-  "06:00 AM", "07:30 AM", "09:00 AM", "10:30 AM",
-  "12:00 PM", "01:30 PM", "03:00 PM", "04:30 PM",
-  "06:00 PM", "07:30 PM", "09:00 PM",
+  "06:00", "07:30", "09:00", "10:30",
+  "12:00", "13:30", "15:00", "16:30",
+  "18:00", "19:30", "21:00",
 ];
 
-// Mock user balance
-const userBalance = 1250;
+interface Location {
+  id: string;
+  name: string;
+  name_bn: string | null;
+}
 
 const Booking = () => {
+  const { t, language } = useLanguage();
+  const { user, profile, isLoading, refreshProfile } = useAuth();
+  const navigate = useNavigate();
+
+  const [locations, setLocations] = useState<Location[]>([]);
   const [location, setLocation] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const minDate = new Date().toISOString().split("T")[0];
   const maxDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
+  useEffect(() => {
+    if (!isLoading && !user) {
+      navigate("/");
+    }
+  }, [user, isLoading, navigate]);
+
+  useEffect(() => {
+    const fetchLocations = async () => {
+      const { data, error } = await supabase
+        .from("locations")
+        .select("id, name, name_bn")
+        .eq("status", "active")
+        .order("name");
+
+      if (error) {
+        console.error("Error fetching locations:", error);
+      } else {
+        setLocations(data || []);
+      }
+    };
+
+    fetchLocations();
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (userBalance < WASHING_PRICE) {
-      toast.error("Insufficient balance. Please recharge first.");
+    if (!user || !profile) return;
+
+    if (profile.balance < WASHING_PRICE) {
+      toast.error(t("insufficientBalance"));
       return;
     }
 
-    setIsLoading(true);
+    setIsSubmitting(true);
 
-    // Simulate booking - in real app, this would call an API
-    setTimeout(() => {
-      setIsLoading(false);
-      toast.success("Booking confirmed! Check your dashboard for OTP.");
+    try {
+      // Generate OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+      // Calculate end time (1.5 hours later)
+      const [hours, minutes] = time.split(":").map(Number);
+      const endHours = hours + 1;
+      const endMinutes = (minutes + 30) % 60;
+      const endTime = `${endHours.toString().padStart(2, "0")}:${endMinutes.toString().padStart(2, "0")}`;
+
+      // Deduct balance
+      const { data: balanceDeducted, error: balanceError } = await supabase
+        .rpc("deduct_balance", {
+          p_user_id: user.id,
+          p_amount: WASHING_PRICE,
+        });
+
+      if (balanceError || !balanceDeducted) {
+        toast.error(t("insufficientBalance"));
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Create booking
+      const { error: bookingError } = await supabase.from("bookings").insert({
+        user_id: user.id,
+        location_id: location,
+        booking_date: date,
+        start_time: time,
+        end_time: endTime,
+        amount: WASHING_PRICE,
+        otp,
+        status: "active",
+      });
+
+      if (bookingError) {
+        console.error("Booking error:", bookingError);
+        // Refund balance if booking fails
+        await supabase.rpc("add_balance", {
+          p_user_id: user.id,
+          p_amount: WASHING_PRICE,
+        });
+        toast.error(t("bookingError"));
+        setIsSubmitting(false);
+        return;
+      }
+
+      await refreshProfile();
+      toast.success(t("bookingConfirmed"));
       navigate("/dashboard");
-    }, 1500);
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error(t("bookingError"));
+    }
+
+    setIsSubmitting(false);
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) return null;
+
+  const userBalance = profile?.balance || 0;
   const canSubmit = location && date && time && userBalance >= WASHING_PRICE;
 
   return (
     <div className="min-h-screen">
-      <Header userName="John Doe" balance={userBalance} isLoggedIn={true} />
+      <Header />
 
       <main className="container mx-auto px-4 py-8 max-w-2xl">
         {/* Page Header */}
@@ -68,9 +158,9 @@ const Booking = () => {
               <WashingMachine className="w-6 h-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Book Washing Slot</h1>
+              <h1 className="text-2xl font-bold text-foreground">{t("bookSlot")}</h1>
               <p className="text-muted-foreground text-sm">
-                Reserve your washing machine time
+                {t("reserveTime")}
               </p>
             </div>
           </div>
@@ -82,9 +172,9 @@ const Booking = () => {
             <div className="flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-medium text-foreground">Insufficient Balance</p>
+                <p className="font-medium text-foreground">{t("insufficientBalance")}</p>
                 <p className="text-sm text-muted-foreground">
-                  You need at least ৳{WASHING_PRICE} to book a slot. Please recharge first.
+                  {t("minRecharge")}: ৳{WASHING_PRICE}
                 </p>
               </div>
             </div>
@@ -96,7 +186,7 @@ const Booking = () => {
           <GlassCardHeader>
             <GlassCardTitle className="text-lg flex items-center gap-2">
               <Calendar className="w-5 h-5 text-primary" />
-              Select Booking Details
+              {t("selectLocation")}
             </GlassCardTitle>
           </GlassCardHeader>
 
@@ -106,16 +196,16 @@ const Booking = () => {
               <div className="space-y-2">
                 <Label className="text-sm font-medium flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-muted-foreground" />
-                  Location
+                  {t("location")}
                 </Label>
                 <Select value={location} onValueChange={setLocation}>
                   <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Select washing location" />
+                    <SelectValue placeholder={t("selectLocation")} />
                   </SelectTrigger>
                   <SelectContent>
                     {locations.map((loc) => (
                       <SelectItem key={loc.id} value={loc.id}>
-                        {loc.name}
+                        {language === "bn" && loc.name_bn ? loc.name_bn : loc.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -126,7 +216,7 @@ const Booking = () => {
               <div className="space-y-2">
                 <Label htmlFor="date" className="text-sm font-medium flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-muted-foreground" />
-                  Booking Date
+                  {t("bookingDate")}
                 </Label>
                 <input
                   type="date"
@@ -144,18 +234,24 @@ const Booking = () => {
               <div className="space-y-2">
                 <Label className="text-sm font-medium flex items-center gap-2">
                   <Clock className="w-4 h-4 text-muted-foreground" />
-                  Time Slot
+                  {t("timeSlot")}
                 </Label>
                 <Select value={time} onValueChange={setTime}>
                   <SelectTrigger className="h-12">
-                    <SelectValue placeholder="Select time slot" />
+                    <SelectValue placeholder={t("selectTime")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {timeSlots.map((slot) => (
-                      <SelectItem key={slot} value={slot}>
-                        {slot} - {getEndTime(slot)}
-                      </SelectItem>
-                    ))}
+                    {timeSlots.map((slot) => {
+                      const [h, m] = slot.split(":").map(Number);
+                      const endH = h + 1;
+                      const endM = (m + 30) % 60;
+                      const endSlot = `${endH.toString().padStart(2, "0")}:${endM.toString().padStart(2, "0")}`;
+                      return (
+                        <SelectItem key={slot} value={slot}>
+                          {slot} - {endSlot}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -163,16 +259,16 @@ const Booking = () => {
               {/* Price Summary */}
               <div className="glass rounded-xl p-4 bg-primary/5">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-muted-foreground">Washing Price</span>
+                  <span className="text-muted-foreground">{t("washingPrice")}</span>
                   <span className="font-semibold text-foreground">৳{WASHING_PRICE}</span>
                 </div>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-muted-foreground">Duration</span>
-                  <span className="font-semibold text-foreground">1.5 hours</span>
+                  <span className="text-muted-foreground">{t("duration")}</span>
+                  <span className="font-semibold text-foreground">1.5 {t("hours")}</span>
                 </div>
                 <div className="border-t border-border pt-3 flex items-center justify-between">
-                  <span className="text-muted-foreground">Your Balance</span>
-                  <span className={`font-bold ${userBalance >= WASHING_PRICE ? 'text-success' : 'text-destructive'}`}>
+                  <span className="text-muted-foreground">{t("yourBalance")}</span>
+                  <span className={`font-bold ${userBalance >= WASHING_PRICE ? "text-success" : "text-destructive"}`}>
                     ৳{userBalance}
                   </span>
                 </div>
@@ -181,15 +277,15 @@ const Booking = () => {
               {/* Submit Button */}
               <Button
                 type="submit"
-                disabled={!canSubmit || isLoading}
+                disabled={!canSubmit || isSubmitting}
                 className="w-full h-12 bg-gradient-primary hover:opacity-90 shadow-primary text-base font-semibold disabled:opacity-50"
               >
-                {isLoading ? (
+                {isSubmitting ? (
                   <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                 ) : (
                   <>
                     <CheckCircle className="w-4 h-4 mr-2" />
-                    Confirm Booking - ৳{WASHING_PRICE}
+                    {t("confirmBooking")} - ৳{WASHING_PRICE}
                   </>
                 )}
               </Button>
@@ -199,23 +295,23 @@ const Booking = () => {
 
         {/* Info Section */}
         <div className="mt-6 glass rounded-xl p-5 animate-fade-in-up animation-delay-200">
-          <h3 className="font-medium text-foreground mb-3">Booking Information</h3>
+          <h3 className="font-medium text-foreground mb-3">{t("bookingInfo")}</h3>
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li className="flex items-start gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2" />
-              Each slot is 1.5 hours long
+              {t("slotDuration")}
             </li>
             <li className="flex items-start gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2" />
-              OTP is valid during first hour of booking only
+              {t("otpValidNote")}
             </li>
             <li className="flex items-start gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2" />
-              You can book up to 7 days in advance
+              {t("advanceBooking")}
             </li>
             <li className="flex items-start gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-primary mt-2" />
-              Cancellations must be made 2 hours before slot time
+              {t("cancellationNote")}
             </li>
           </ul>
         </div>
@@ -223,24 +319,5 @@ const Booking = () => {
     </div>
   );
 };
-
-// Helper function to calculate end time
-function getEndTime(startTime: string): string {
-  const [time, period] = startTime.split(" ");
-  const [hours, minutes] = time.split(":").map(Number);
-  
-  let hour24 = hours;
-  if (period === "PM" && hours !== 12) hour24 += 12;
-  if (period === "AM" && hours === 12) hour24 = 0;
-  
-  const endHour24 = hour24 + 1;
-  const endMinutes = (minutes + 30) % 60;
-  
-  let endHour = endHour24 % 12;
-  if (endHour === 0) endHour = 12;
-  const endPeriod = endHour24 >= 12 ? "PM" : "AM";
-  
-  return `${endHour.toString().padStart(2, "0")}:${endMinutes.toString().padStart(2, "0")} ${endPeriod}`;
-}
 
 export default Booking;
