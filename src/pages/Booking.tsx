@@ -10,6 +10,8 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import AnimatedBackground from "@/components/AnimatedBackground";
+import DesignerCredit from "@/components/DesignerCredit";
 
 const WASHING_PRICE = 50;
 
@@ -147,7 +149,9 @@ const Booking = () => {
   const canSubmit = location && date && time && userBalance >= WASHING_PRICE;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen relative">
+      <AnimatedBackground />
+      <DesignerCredit />
       <Header />
 
       <main className="container mx-auto px-4 py-8 max-w-2xl">
