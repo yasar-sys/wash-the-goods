@@ -1,22 +1,42 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { WashingMachine, Mail, Lock, Eye, EyeOff, UserPlus, User, Phone, LogIn } from "lucide-react";
+import { WashingMachine, Mail, Lock, Eye, EyeOff, UserPlus, User, Phone, LogIn, AlertCircle, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GlassCard, GlassCardContent, GlassCardHeader } from "@/components/ui/GlassCard";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
+import LanguageToggle from "@/components/LanguageToggle";
 import { toast } from "sonner";
+import { z } from "zod";
+
+const registerSchema = z.object({
+  fullName: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.string().email("Invalid email address"),
+  phone: z.string().min(11, "Phone number must be at least 11 digits"),
+  studentId: z.string().min(1, "Student ID is required"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
 
 const Register = () => {
+  const { t } = useLanguage();
+  const { signUp } = useAuth();
   const [formData, setFormData] = useState({
-    name: "",
+    fullName: "",
     email: "",
     phone: "",
+    studentId: "",
     password: "",
     confirmPassword: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -25,20 +45,38 @@ const Register = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
 
-    if (formData.password !== formData.confirmPassword) {
-      toast.error("Passwords do not match");
+    // Validate input
+    const validation = registerSchema.safeParse(formData);
+    if (!validation.success) {
+      setError(validation.error.errors[0].message);
       return;
     }
 
     setIsLoading(true);
 
-    // Simulate registration - in real app, this would call an API
-    setTimeout(() => {
+    const { error: signUpError } = await signUp(
+      formData.email,
+      formData.password,
+      formData.fullName,
+      formData.phone,
+      formData.studentId
+    );
+
+    if (signUpError) {
+      if (signUpError.message.includes("already registered")) {
+        setError("This email is already registered. Please login instead.");
+      } else {
+        setError(t("registerError"));
+      }
       setIsLoading(false);
-      toast.success("Registration successful! Please login.");
-      navigate("/");
-    }, 1500);
+      return;
+    }
+
+    toast.success("Registration successful! Please check your email to verify your account.");
+    navigate("/");
+    setIsLoading(false);
   };
 
   return (
@@ -49,14 +87,19 @@ const Register = () => {
         <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-secondary/20 rounded-full blur-3xl" />
       </div>
 
+      {/* Language Toggle */}
+      <div className="fixed top-4 right-4 z-50">
+        <LanguageToggle />
+      </div>
+
       <div className="w-full max-w-md relative z-10">
         {/* Logo Section */}
         <div className="text-center mb-8 animate-fade-in-up">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-primary rounded-2xl shadow-lg shadow-primary/30 mb-4 animate-float">
             <WashingMachine className="w-10 h-10 text-primary-foreground" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground">SmartWash</h1>
-          <p className="text-muted-foreground mt-2">Create your account</p>
+          <h1 className="text-3xl font-bold text-foreground">{t("appName")}</h1>
+          <p className="text-muted-foreground mt-2">{t("createAccount")}</p>
         </div>
 
         {/* Register Card */}
@@ -64,28 +107,35 @@ const Register = () => {
           <GlassCardHeader className="text-center pb-2">
             <div className="flex items-center justify-center gap-2 text-xl font-semibold text-foreground">
               <UserPlus className="w-5 h-5 text-primary" />
-              New Registration
+              {t("register")}
             </div>
             <p className="text-sm text-muted-foreground">
-              Fill in your details to create an account
+              {t("fillDetails")}
             </p>
           </GlassCardHeader>
 
           <GlassCardContent>
+            {error && (
+              <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-2 text-destructive text-sm">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                {error}
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Name */}
               <div className="space-y-2">
-                <Label htmlFor="name" className="text-sm font-medium">
-                  Full Name
+                <Label htmlFor="fullName" className="text-sm font-medium">
+                  {t("fullName")}
                 </Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
-                    id="name"
-                    name="name"
+                    id="fullName"
+                    name="fullName"
                     type="text"
-                    placeholder="Enter your full name"
-                    value={formData.name}
+                    placeholder={t("fullName")}
+                    value={formData.fullName}
                     onChange={handleChange}
                     className="pl-10 h-12"
                     required
@@ -96,7 +146,7 @@ const Register = () => {
               {/* Email */}
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium">
-                  Email Address
+                  {t("email")}
                 </Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -104,7 +154,7 @@ const Register = () => {
                     id="email"
                     name="email"
                     type="email"
-                    placeholder="Enter your email"
+                    placeholder={t("email")}
                     value={formData.email}
                     onChange={handleChange}
                     className="pl-10 h-12"
@@ -116,7 +166,7 @@ const Register = () => {
               {/* Phone */}
               <div className="space-y-2">
                 <Label htmlFor="phone" className="text-sm font-medium">
-                  Phone Number
+                  {t("phone")}
                 </Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -124,8 +174,28 @@ const Register = () => {
                     id="phone"
                     name="phone"
                     type="tel"
-                    placeholder="Enter your phone number"
+                    placeholder={t("phone")}
                     value={formData.phone}
+                    onChange={handleChange}
+                    className="pl-10 h-12"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Student ID */}
+              <div className="space-y-2">
+                <Label htmlFor="studentId" className="text-sm font-medium">
+                  {t("studentId")}
+                </Label>
+                <div className="relative">
+                  <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="studentId"
+                    name="studentId"
+                    type="text"
+                    placeholder={t("studentId")}
+                    value={formData.studentId}
                     onChange={handleChange}
                     className="pl-10 h-12"
                     required
@@ -136,7 +206,7 @@ const Register = () => {
               {/* Password */}
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-sm font-medium">
-                  Password
+                  {t("password")}
                 </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -144,7 +214,7 @@ const Register = () => {
                     id="password"
                     name="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="Create a password"
+                    placeholder={t("password")}
                     value={formData.password}
                     onChange={handleChange}
                     className="pl-10 pr-10 h-12"
@@ -163,7 +233,7 @@ const Register = () => {
               {/* Confirm Password */}
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword" className="text-sm font-medium">
-                  Confirm Password
+                  {t("confirmPassword")}
                 </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -171,7 +241,7 @@ const Register = () => {
                     id="confirmPassword"
                     name="confirmPassword"
                     type={showPassword ? "text" : "password"}
-                    placeholder="Confirm your password"
+                    placeholder={t("confirmPassword")}
                     value={formData.confirmPassword}
                     onChange={handleChange}
                     className="pl-10 h-12"
@@ -190,7 +260,7 @@ const Register = () => {
                 ) : (
                   <>
                     <UserPlus className="w-4 h-4 mr-2" />
-                    Create Account
+                    {t("createAccount")}
                   </>
                 )}
               </Button>
@@ -198,13 +268,13 @@ const Register = () => {
 
             <div className="mt-6 pt-6 border-t border-border text-center">
               <p className="text-sm text-muted-foreground">
-                Already have an account?{" "}
+                {t("hasAccount")}{" "}
                 <Link
                   to="/"
                   className="text-primary font-medium hover:underline inline-flex items-center gap-1"
                 >
                   <LogIn className="w-3.5 h-3.5" />
-                  Login here
+                  {t("loginHere")}
                 </Link>
               </p>
             </div>
@@ -213,7 +283,7 @@ const Register = () => {
 
         {/* Footer */}
         <p className="text-center text-sm text-muted-foreground mt-6 animate-fade-in-up animation-delay-200">
-          © 2024 SmartWash. All rights reserved.
+          © 2024 {t("appName")}. {t("copyright")}.
         </p>
       </div>
     </div>
