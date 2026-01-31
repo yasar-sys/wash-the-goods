@@ -20,9 +20,9 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "robots.txt"],
       manifest: {
-        name: "SmartWash - Smart Laundry Booking",
-        short_name: "SmartWash",
-        description: "Book washing machine slots easily with SmartWash",
+        name: "Wash the Goods - Smart Laundry Booking",
+        short_name: "Wash the Goods",
+        description: "Book washing machine slots easily with Wash the Goods",
         theme_color: "#0891b2",
         background_color: "#f0fdfa",
         display: "standalone",
