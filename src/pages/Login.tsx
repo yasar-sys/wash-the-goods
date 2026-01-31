@@ -19,7 +19,7 @@ const loginSchema = z.object({
 });
 
 const Login = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { signIn, isLoading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -161,7 +161,7 @@ const Login = () => {
               </Button>
             </form>
 
-            <div className="mt-6 pt-6 border-t border-border text-center">
+            <div className="mt-6 pt-6 border-t border-border text-center space-y-3">
               <p className="text-sm text-muted-foreground">
                 {t("noAccount")}{" "}
                 <Link
@@ -170,6 +170,14 @@ const Login = () => {
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                   {t("registerHere")}
+                </Link>
+              </p>
+              <p className="text-sm">
+                <Link
+                  to="/manual"
+                  className="text-muted-foreground hover:text-primary transition-colors"
+                >
+                  📖 {language === "bn" ? "ব্যবহারকারী ম্যানুয়াল" : "User Manual"}
                 </Link>
               </p>
             </div>
