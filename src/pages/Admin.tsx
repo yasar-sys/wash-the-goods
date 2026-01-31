@@ -9,6 +9,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import LanguageToggle from "@/components/LanguageToggle";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import AnimatedBackground from "@/components/AnimatedBackground";
+import DesignerCredit from "@/components/DesignerCredit";
 
 // Admin sub-pages
 import AdminDashboard from "./admin/AdminDashboard";
@@ -56,7 +58,9 @@ const Admin = () => {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex relative">
+      <AnimatedBackground />
+      <DesignerCredit />
       {/* Sidebar */}
       <aside
         className={cn(

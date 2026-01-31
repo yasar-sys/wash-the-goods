@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import AnimatedBackground from "@/components/AnimatedBackground";
+import DesignerCredit from "@/components/DesignerCredit";
 
 interface Booking {
   id: string;
@@ -88,7 +90,9 @@ const Dashboard = () => {
   const today = new Date().toISOString().split("T")[0];
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen relative">
+      <AnimatedBackground />
+      <DesignerCredit />
       <Header />
 
       <main className="container mx-auto px-4 py-8">
